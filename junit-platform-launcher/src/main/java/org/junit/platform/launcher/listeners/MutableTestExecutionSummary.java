@@ -16,7 +16,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.junit.platform.launcher.TestIdentifier;
@@ -31,6 +30,7 @@ class MutableTestExecutionSummary implements TestExecutionSummary {
 
 	private static final String TAB = "  ";
 	private static final String DOUBLE_TAB = TAB + TAB;
+	private static final int MAX_STACKTRACE_LINES = 10;
 
 	final AtomicLong containersFound = new AtomicLong();
 	final AtomicLong containersStarted = new AtomicLong();
@@ -187,6 +187,7 @@ class MutableTestExecutionSummary implements TestExecutionSummary {
 				writer.println(TAB + describeTest(failure.getTestIdentifier()));
 				failure.getTestIdentifier().getSource().ifPresent(source -> writer.println(DOUBLE_TAB + source));
 				writer.println(String.format("%s=> %s", DOUBLE_TAB, failure.getException()));
+				printStackTrace(writer, failure.getException(), MAX_STACKTRACE_LINES);
 			});
 			writer.flush();
 		}
@@ -199,15 +200,23 @@ class MutableTestExecutionSummary implements TestExecutionSummary {
 
 	private String describeTest(TestIdentifier testIdentifier) {
 		List<String> descriptionParts = new ArrayList<>();
-		collectTestDescription(Optional.of(testIdentifier), descriptionParts);
+		collectTestDescription(testIdentifier, descriptionParts);
 		return join(":", descriptionParts);
 	}
 
-	private void collectTestDescription(Optional<TestIdentifier> optionalIdentifier, List<String> descriptionParts) {
-		optionalIdentifier.ifPresent(testIdentifier -> {
-			descriptionParts.add(0, testIdentifier.getDisplayName());
-			collectTestDescription(this.testPlan.getParent(testIdentifier), descriptionParts);
-		});
+	private void collectTestDescription(TestIdentifier identifier, List<String> descriptionParts) {
+		descriptionParts.add(0, identifier.getDisplayName());
+		this.testPlan.getParent(identifier).ifPresent(parent -> collectTestDescription(parent, descriptionParts));
+	}
+
+	private void printStackTrace(PrintWriter writer, Throwable throwable, int max) {
+		StackTraceElement[] elements = throwable.getStackTrace();
+		for (int i = 0; i < (elements.length > max ? max : elements.length); i++) {
+			writer.println(String.format("%s   %s", DOUBLE_TAB, elements[i]));
+		}
+		if (elements.length > max) {
+			writer.println(String.format("%s   [...]", DOUBLE_TAB));
+		}
 	}
 
 	private static class DefaultFailure implements Failure {
