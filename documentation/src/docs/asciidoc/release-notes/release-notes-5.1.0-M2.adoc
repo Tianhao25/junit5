@@ -43,7 +43,8 @@ on GitHub.
 
 ==== Deprecations and Breaking Changes
 
-* ❓
+* New `getConfigurationParameter(String key)` method in interface `ExtensionContext`.
+  Extensions can now access and evaluate configuration parameter values at runtime.
 
 ==== New Features and Improvements
 
